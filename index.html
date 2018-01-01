@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>game:)</title>
+
+
+	<link href="https://fonts.googleapis.com/css?family=Leckerli+One" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=McLaren" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Bree+Serif" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Bubblegum+Sans" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Ultra" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Fredoka+One" rel="stylesheet">
+    
+	<link href="style/shared.css" rel="stylesheet" type="text/css"/>
+	<link href="style/examples.css" rel="stylesheet" type="text/css"/>
+	<script src="js/examples.js"></script>
+	<script src="js/easeljs-NEXT.combined.js"></script>
+    <script src="js/tweenjs-0.6.2.min.js"></script>
+   	<script src="js/puzzles.js"></script>
+    <script src="js/ImageLoading.js"></script>
+	
+
+<script id="editable">
+	var canvas, stage;                  
+	var container;
+	var restart= false
+	var gameWon = 0;
+	var gameStarted = false;	
+	var msRequired = 60;
+	var ms = 0;
+	
+
+	var trashShadowCommand;
+	var tcContainer;
+	var heartContainer;
+	var barContainer;
+	var gameNumContainer 
+	var bgEffects;
+	
+	var timeBar;
+	var gameLogo;
+	var homeButton;
+	
+	var lives = 5;
+	
+	var answer =0;
+	
+	var greenH =0;
+	var redH =0 ;
+	
+	var pMarginX,pMarginY,pW,pH,barW,barH;
+	
+	var questionContainer;
+	
+	var trashIcon;
+	var trashCommand;
+	
+	var puzzleId = 0;
+	var puzzleOn = false;
+	
+	var mouseTarget;	// the display object currently under the mouse, or being dragged
+	var dragStarted = false;	// indicates whether we are currently in a drag operation
+	var offset;
+	var update = true;
+	
+	var currentPuzzle;
+	var currentHashtags;
+	
+	var hashtagContainer;
+	
+	var isMobile = {
+    Android: function() {
+        return navigator.userAgent.match(/Android/i);
+    },
+    BlackBerry: function() {
+        return navigator.userAgent.match(/BlackBerry/i);
+    },
+    iOS: function() {
+        return navigator.userAgent.match(/iPhone|iPad|iPod/i);
+    },
+    Opera: function() {
+        return navigator.userAgent.match(/Opera Mini/i);
+    },
+    Windows: function() {
+        return navigator.userAgent.match(/IEMobile/i);
+    },
+    any: function() {
+        return (isMobile.Android() || isMobile.BlackBerry() || isMobile.iOS() || isMobile.Opera() || isMobile.Windows());
+    }
+};
+	
+	function init() {
+		//examples.showDistractor();
+		// create stage and point it to the canvas:
+		canvas = document.getElementById("testCanvas");
+		canvas.width = document.body.clientWidth; //document.width is obsolete
+		canvas.height = document.body.clientHeight; //document.height is obsolete
+		canvasW = canvas.width
+		canvasH = canvas.height
+		pMarginX = canvasH * 0.075;
+		pMarginY = canvasH * 0.05;
+		pW = canvasW * 0.6
+		pH = canvasH - pMarginY * 2
+		
+		barW = (canvasW - pW - pMarginX*2) * 0.85
+		barH = pH * 0.6
+		
+		stage = new createjs.Stage(canvas);
+		//stage.cursor = "none"
+		// enable touch interactions if supported on the current device:
+		createjs.Touch.enable(stage);
+
+		// enabled mouse over / out events
+		stage.enableMouseOver(10);
+		stage.mouseMoveOutside = true; // keep tracking the mouse even when it leaves the canvas
+		
+		// load the source image:
+		loadImages();
+	}
+
+	function stop() {
+		createjs.Ticker.removeEventListener("tick", tick);
+	}
+
+	function handleComplete(event) {
+		//var image = event.target;
+		//var bitmap;
+		//container = new createjs.Container();
+		//stage.addChild(container);
+		
+		
+		
+		puzzleSetup();
+		drawStart()
+		
+		//examples.hideDistractor();
+		createjs.Ticker.timingMode = createjs.Ticker.RAF; // new
+		createjs.Ticker.addEventListener("tick", tick);
+	}
+	
+	function drawGame(){
+		stage.removeAllChildren()
+		puzzleId = Math.floor(puzzles.length*Math.random())
+		drawBg();
+		drawQuestionBox()
+		drawBar();
+		puzzles[puzzleId].draw()
+		
+		drawGameLogo()
+		
+		
+		//drawTimeBar()
+		drawHome();
+		drawGameNum()
+		drawHearts();
+		}
+
+	function resetGame(){
+		gameWon = 0
+		lives = 5
+		greenH = 0
+		redH = 0
+		}
+		
+	function drawGameNum(){
+		var container = new createjs.Container()
+		var g = new createjs.Graphics()
+		g.beginFill("rgba(0,0,0,0)").drawRoundRectComplex(0,0,pW*0.3,pMarginY*2,0,0,20,20)
+		var shape = new createjs.Shape(g)
+		text = new createjs.Text("Challenge " + (gameWon+1) + "/" + puzzles.length ,"24px Bree Serif","white")
+		text.textAlign = 'center'
+		text.x = pW*0.15
+		text.y = pMarginY - 12
+		text.shadow = new createjs.Shadow("rgba(0,0,0,0.6)",0,0,5)
+		container.addChild(shape,text)
+		container.x = 0 
+		container.y = pMarginY * 0.5
+		currentPuzzle.addChild(container)
+		gameNumContainer = container
+		}
+	
+	function drawHearts(){
+		var width = barW*0.65
+		var height = pH * 0.1
+		
+		heartContainer = new createjs.Container();
+		heartContainer.x = canvasW - pMarginX-barW*0.9
+		heartContainer.y = canvasH - pMarginY - height*1.5 
+		stage.addChild(heartContainer)
+		
+		var g = new createjs.Graphics()
+		g.beginFill("rgba(255,255,255,0.5)").drawRoundRect(0,0,width,height,20)
+		var shape = new createjs.Shape(g)
+		heartContainer.addChild(shape)
+		
+		for (var i=0;i<5;i++){
+			var container = new createjs.Container()
+			var top = new createjs.Bitmap(heart1)
+			var bottom = new createjs.Bitmap(heart2)
+			var scale = height*0.5 /heart1.width
+			top.scaleX=top.scaleY=bottom.scaleX=bottom.scaleY = scale
+			container.addChild(bottom,top)
+			container.x= width/6*(i+1) - scale * heart1.width/2
+			container.y= height/2 - scale*heart1.height/2
+			bottom.alpha = 0
+			heartContainer.addChild(container)
+			}
+		
+		
+		}
+	
+	function drawQuestionBox(){
+		var width = barW
+		var height = pH*0.25
+		var borderW = 10
+		var radius = height*0.4
+		var tMargin = width * 0.1
+		var box = new createjs.Graphics();
+		questionContainer = new createjs.Container()
+		stage.addChild(questionContainer)
+		questionContainer.regY = height/2
+		questionContainer.x = canvasW-pMarginX-width
+		questionContainer.y = pMarginY +height/2
+		box.setStrokeStyle(3).beginStroke("#0c3c88").beginFill("#0c3c88").drawRoundRect(0,5,width,height,radius)
+		box.setStrokeStyle(3).beginStroke("#0c3c88").beginFill("White").drawRoundRect(0,0,width,height,radius)
+		box.setStrokeStyle(2).beginStroke("#ebebeb").beginLinearGradientFill(["#ebebeb","white"],[0,0.25],0,0,0,height).drawRoundRect(borderW,borderW,width-borderW*2,height-borderW*2,radius-2)
+		var boxS = new createjs.Shape(box);
+		var text = new createjs.Text("","24px Bree Serif","#0d397e")
+		text.x = text.y = tMargin
+		text.lineWidth = width - tMargin*2
+		questionContainer.addChild(boxS,text)
+		
+		var counter = new createjs.Container();
+		questionContainer.addChild(counter)
+		var g = new createjs.Graphics();
+		g.beginFill("#861c1c").drawCircle(0,0,radius*0.5)
+		g.beginFill("#c41717").drawCircle(0,-radius*0.065,radius*0.4)
+		var circle = new createjs.Shape(g)
+		var count = new createjs.Text(puzzles[puzzleId].hashtags.length,Math.floor(radius*0.6) + "px Bree Serif","white")
+		count.textAlign = 'center'
+		count.y = - radius*(0.5)
+		
+		counter.addChild(circle,count)
+		counter.x = width - radius*0.65
+		counter.y = height-radius*0.75
+		counter.scaleX = counter.scaleY = 0
+		
+		}
+	
+	function drawGameLogo(){
+		currentPuzzle.addChild(gameLogo)
+		//gameLogo.scaleX=gameLogo.scaleY=barW*0.25/gameLogo.getBounds().width
+		}
+	
+	function drawHome(){
+		homeButton = new createjs.Container()
+		stage.addChild(homeButton)
+		var radius = barW *0.075
+		var circle = new createjs.Graphics()
+		circle.beginFill("#802355").drawCircle(0,0,radius)
+		circle.beginFill("#b72b5a").drawCircle(0,0,radius*0.8)
+		var circleS = new createjs.Shape(circle)
+		var icon = new createjs.Bitmap(homeIcon)
+		var scale = radius*1.2/homeIcon.height
+		icon.scaleX = icon.scaleY = scale
+		icon.x = -homeIcon.width * scale/ 2
+		icon.y = -homeIcon.height * scale/ 2
+		
+		homeButton.addChild(circleS,icon)
+		homeButton.x = canvasW - pMarginX - radius
+		homeButton.y = canvasH - pMarginY - radius
+		homeButton.cursor = "pointer"
+		
+		homeButton.on("mouseover",function(){
+		
+		homeButton.scaleX = homeButton.scaleY = 1.2
+		
+		})
+		
+	homeButton.on("mouseout",function(){
+		
+		homeButton.scaleX = homeButton.scaleY = 1
+		
+		})
+	
+		homeButton.on("click",function(){
+		gameStarted = false
+		greenH = 0
+		redH = 0;
+		ms = 0
+		drawStart();
+		})
+		
+		};
+	
+	function drawBg(){
+		var bg = new createjs.Graphics();
+		bg.beginFill("#1f51a2").drawRect(0,0,canvasW,canvasH);
+		var shape = new createjs.Shape(bg);
+		stage.addChild(shape);
+		}
+	
+	function drawBar(){
+		var bar = new createjs.Graphics();
+		bar.beginFill("rgba(0,0,0,0)").drawRoundRect(0,0,barW,barH,20);
+		//bar.beginFill("#acddfa").drawCircle(canvasW-pMarginX-barW/2,pMarginY+barW/2*1.1+50,barW*1.1/2)
+		var shape = new createjs.Shape(bar);
+		//stage.addChild(shape)
+		var trash = new createjs.Graphics();
+		//trashCommand = trash.beginFill("#002663").command
+		//trash.drawRoundRect(10,10,barW-20,barH-20,18)
+		var margin = 30
+		trash.setStrokeStyle(4).beginFill("#002663").beginStroke("#0c3c88").drawRoundRect(margin,barH*0.25,barW-margin*2,barH*0.75-margin,18)
+		var trashS = new createjs.Shape(trash);
+		var trashShadow = new createjs.Graphics();
+		trashShadowCommand = trashShadow.beginFill("#0c3c88").command
+		trashShadow.drawRoundRect(margin+(barH*0.75-margin)*0.1,barH*0.25+(barH*0.75-margin)*0.1,barW-margin*2-(barH*0.75-margin)*0.1-2,(barH*0.75-margin)*0.9-2,18)
+		var trashShadowS = new createjs.Shape(trashShadow)
+		var hash = new createjs.Text("#","","")
+		var question = new createjs.Graphics();
+		question.setStrokeDash([7,5]).beginFill("white").drawRoundRect(margin,margin,barW-margin*2,barH*0.25-margin*2,(barH*0.25-margin*2)/2)
+		question.beginFill("7caee2").drawCircle(margin+(barH*0.25-25)/2,margin+(barH*0.25-25)/4,5)
+		var questionS = new createjs.Shape(question)
+		//trashS.graphics.setStrokeDash([5,5]).setStrokeStyle(3).beginStroke("white").drawRoundRect(15,15,barW-30,barH-30,18)
+		var trashContainer = new createjs.Container()
+		hashtagContainer = new createjs.Container();
+		hashtagContainer.alpha = 0
+		hashtagContainer.setBounds(margin+(barH*0.75-margin)*0.1,barH*0.25+(barH*0.75-margin)*0.1,barW-margin*2-(barH*0.75-margin)*0.1-2,(barH*0.75-margin)*0.9-2)
+		tcContainer = new createjs.Container();
+		//hashtagContainer.addChild()
+		
+		var t = new createjs.Bitmap(tick2)
+		var c = new createjs.Bitmap(cross)
+		var h = new createjs.Bitmap(hashtagSymbol)
+		tcContainer.addChild(h,t,c)
+		
+		t.alpha = 0
+		c.alpha = 0
+		var a = new createjs.Bitmap(arrow)
+		a.regX = arrow.width
+		a.regY = arrow.height
+		var scale2 = barW*0.45 /arrow.width
+		a.scaleX = a.scaleY = scale2
+		a.x = margin+(barH*0.75-margin)*0.1
+		a.y = barH*0.25+(barH*0.75-margin)*0.1+pH *0.03
+		a.alpha = 0.5
+		a.shadow = new createjs.Shadow("rgba(0,0,0,0.5)",5,5,5)
+		
+		trashContainer.addChild(trashS,trashShadowS,tcContainer,hashtagContainer,a)
+		//stage.addChild(trashContainer)
+		
+		barContainer = new createjs.Container();
+		stage.addChild(barContainer)
+		barContainer.addChild(shape,trashContainer)
+		drawTrash(trashContainer)
+		
+		
+		barContainer.x = canvasW-pMarginX-barW/2
+		barContainer.y = pMarginY+pH*0.15+barH/2 +barH * 0.1
+		barContainer.regX = barW/2
+		barContainer.regY = barH/2
+		
+		var scale = barW * 0.5/ tcContainer.getBounds().width
+		tcContainer.scaleX = tcContainer.scaleY = scale;
+		tcContainer.x = barW/2-tcContainer.getBounds().width/2*scale
+		tcContainer.y = barH*0.25+(barH*0.75-margin)*0.1+((barH*0.75-margin)*0.9-2)/2-tcContainer.getBounds().height/2*scale
+		
+		}
+	
+	function drawTimeBar(){
+		
+		timeBar = new createjs.Container();
+		timeBar.x = canvasW - pMarginX - barW
+		timeBar.y = pMarginY
+		
+		stage.addChild(timeBar);
+		
+		var radius = pH*0.04
+		
+		var bar1 = new createjs.Graphics();
+		bar1.beginFill("#acddfa").drawRoundRect(0,radius*0.25,barW,radius*1.5,radius*0.75)
+		bar1.beginFill("rgba(69,113,182,1)").drawRoundRect(0,radius*0.5,barW-10,radius,radius*0.5)
+		
+		var bar1s = new createjs.Shape(bar1);
+		
+		var bar2 = new createjs.Graphics();
+		var bar2s = new createjs.Shape(bar2)
+		//bar2s.scaleX = 0;
+		
+		//var barCircle = new createjs.Graphics()
+		//barCircle.beginFill("pink").drawCircle(radius*0.5+(barW-10-radius)/(msRequired+1),radius,radius*0.5)
+		
+		//var barCircleS = new createjs.Shape(barCircle)
+		//barCircleS.increment = (barW-10-radius)/(msRequired+1)
+		
+		var logo = new createjs.Container();
+		
+		var circle = new createjs.Graphics();
+		circle.beginFill("white").drawCircle(radius,radius,radius)
+		
+		var circleS = new createjs.Shape(circle)
+		var ms1 = new createjs.Text("MS","bold 25px Bree Serif","grey")
+		ms1.textAlign = "center"
+		ms1.x = radius
+		ms1.y = radius/2 - 4
+		logo.addChild(circleS,ms1)
+		
+		var text = new createjs.Text(ms+"/"+msRequired,"20px Bree Serif","white")
+		text.textAlign = "right";
+		text.x = barW-20
+		text.y = radius-14
+		timeBar.addChild(bar1s,bar2s,logo,text)
+		}
+	
+	function drawIntro(){
+		
+		var w = pW*0.3
+		var h = pH*0.075
+		//Welcome to Dis-ability! Disability is often misrepresented in the media. Through this game we would like to introduce you to some of the most common stereotypes for disdabled people on the media such as 'victims' and 'supercrib', and provide a vision of what should be an accurate portayal of disability.
+		//Let's forget what the media have told you about disability. Throw it all away! Drag the hashtag labels to the litter bin on your right. You shall find something interesting.
+		var bg1 = new createjs.Graphics()
+		bg1.beginFill("rgba(0,0,0,0.9)").drawRect(0,0,canvasW,canvasH)
+		
+		var bg = new createjs.Shape(bg1)
+		var text1 = new createjs.Text("Disability. If the first picture that comes to your mind relates to athletes showing off their lost limps, or perhaps a sad miserable movie character in a wheelchair, be aware! Disability in the media seldom reflects reality. ",Math.floor(pH*0.035) + "px Bree Serif","white")   
+		
+		var text2 = new createjs.Text("In this game, you will have an opportunity to distinguish characteristics of disability in real life from the misleading portrayals in the media. Let's get started!",Math.floor(pH*0.035) + "px Bree Serif","white")
+		
+		text1.lineWidth = text2.lineWidth = pW * 0.8
+		
+		var continueButton  = new createjs.Container();
+		
+		var container = new createjs.Container();
+		container.addChild(bg,text1,text2,continueButton)
+		container.alpha = 0
+		
+		stage.addChild(container)
+		
+		text1.x = pMarginX + pW/2 - text1.getBounds().width/2
+		text2.x = pMarginX + pW/2- text2.getBounds().width/2
+		text1.y = canvasH*0.25
+		text2.y = text1.y + text1.getBounds().height + canvasH * 0.1
+		
+		
+		
+		var button1 = new createjs.Graphics();
+		button1.beginFill("rgba(255,0,0,0.5)").drawRoundRect(0,0,w,h,h/2)
+		var s1 = new createjs.Shape(button1);
+		var continueText = new createjs.Text("Start!", Math.floor(h*0.7) + "px Ultra","rgba(255,255,255,1)")
+		continueText.textAlign = 'center'
+		continueText.x = w/2
+		continueText.y = h*0.1
+		
+		continueButton.addChild(s1,continueText);
+		
+		continueButton.cursor = "pointer"
+		continueButton.regX = continueButton.getBounds().width/2
+		continueButton.regY = continueButton.getBounds().height/2
+		continueButton.x = pMarginX + pW/2 
+		continueButton.y = canvasH*0.75
+		
+		continueButton.on("mouseover",function(){
+		
+			continueButton.scaleX = continueButton.scaleY = 1.2
+		
+		})
+		
+		continueButton.on("mouseout",function(){
+		
+			continueButton.scaleX = continueButton.scaleY = 1
+		
+			})
+	
+		continueButton.on("click",function(evt){
+			console.log(evt.target)
+			evt.target.parent.removeAllEventListeners("click")
+			showInstructions()}
+		
+		
+		)
+		
+		var tween = createjs.Tween.get(container)
+			.to({alpha:1},500)
+		
+		}
+	
+	function showInstructions(){
+		var container = stage.getChildAt(stage.numChildren-1)
+		gameStarted = true
+		var tween = createjs.Tween.get(container).to({alpha:0},350).call(function(tween){stage.removeChild(tween._target)})
+		
+		var instr = new createjs.Container()
+		stage.addChild(instr)
+		var text = new createjs.Text("Drag your answers to the box on the right.","24px Bree Serif","white")
+		text.textAlign = "center"
+		instr.addChild(text)
+		var g = new createjs.Graphics();
+		g.beginFill("black").setStrokeStyle(2).beginStroke("black").drawRoundRect(0,0,text.getBounds().width+50,50,25)
+		var shape = new createjs.Shape(g);
+		instr.addChildAt(shape,0)
+		instr.x = pMarginX+pW/2 - (text.getBounds().width+50)/2
+		instr.y = canvasH/2 - 25
+		instr.alpha = 0
+		text.x = (text.getBounds().width+50)/2
+		text.y = 35/2-12
+		
+		var tween2 = createjs.Tween.get(instr).wait(350).to({alpha:1},350).wait(3000).to({alpha:0},350).call(hintTrash).wait(500).call(startGame2).call(function(tween){stage.removeChild(tween._target)})
+		
+		
+		}
+	
+	function hintTrash(){
+		
+		if((redH +greenH)==0){
+			var scale = tcContainer.parent.getChildAt(4).scaleX
+			
+			var tween2 = createjs.Tween.get(tcContainer.parent.getChildAt(4))
+									.wait(700)
+									.to({scaleX:scale*1.075,scaleY:scale*1.075},350)
+									.to({scaleX:scale,scaleY:scale},350)
+									.to({scaleX:scale*1.075,scaleY:scale*1.075},350)
+									.to({scaleX:scale,scaleY:scale},350)
+									.wait(3000)
+									.call(hintTrash)
+				
+				}
+		
+		}
+	
+	function msIncrease(num){
+		var radius = pH *0.04
+		ms += num
+		if(ms<msRequired){
+			timeBar.getChildAt(1).graphics.beginFill("pink").drawRoundRect(0,radius*0.5,radius*2+(barW-10-radius*2)*ms/msRequired,radius,radius*0.5)
+			} else{
+			timeBar.getChildAt(1).graphics.beginFill("pink").drawRoundRect(0,radius*0.5,barW-10,radius,radius*0.5)
+			ms = msRequired
+			}
+		timeBar.getChildAt(3).text = ms + "/" +msRequired
+		var text = new createjs.Text("+"+num,"bold 30px Bree Serif","yellow")
+		text.x = radius*2
+		timeBar.addChild(text)
+		var tween = createjs.Tween.get(text)
+					.to({y:-pMarginY,alpha:0},350)
+					.call(function(){
+						timeBar.removeChild(timeBar.getChildAt(timeBar.numChild-1))
+						})
+		}
+	
+	function drawTrash(trash){
+		trashIcon = new createjs.Container();
+		trashIcon.alpha = 0
+		var lid = new createjs.Bitmap(trash_lid)
+		lid.regX = 207
+		lid.regY = 67
+		lid.x = lid.regX
+		lid.y = lid.regY
+		
+		var bin = new createjs.Bitmap(trash_bin)
+		bin.y = trash_lid.height;
+		
+		trashIcon.addChild(lid,bin)
+		trash.addChild(trashIcon)
+		
+		var scale = barW*0.2/trashIcon.getBounds().width
+		trashIcon.scaleX = trashIcon.scaleY = trashIcon.scale = scale
+		trashIcon.x =  15 + (barW-30)/2-trashIcon.getBounds().width*scale/2 || 0
+		trashIcon.y =  15 + (barH-30)/2 -trashIcon.getBounds().height*scale/2 - 15|| 0
+		
+		var text = new createjs.Text("Drag hashtags here to reveal secret image.", "16px Bree Serif", "White")
+		text.alpha = 0
+		text.textAlign = "center"
+		text.x = trashIcon.x +trashIcon.getBounds().width*scale/2
+		text.y = trashIcon.y +trashIcon.getBounds().height*scale + 30
+		text.lineWidth = barW*0.7
+		
+		trash.addChild(text)
+		
+		stage.update();
+		
+		};
+
+function drawStart(){
+	puzzleOn = false;
+	stage.removeAllChildren();
+	drawBg();
+	drawEffects();
+	drawStartButtons();
+	drawLogo();
+	}
+
+function drawWinLose(condition){
+	
+		var w = pW*0.3
+		var h = pH*0.075
+		//Welcome to Dis-ability! Disability is often misrepresented in the media. Through this game we would like to introduce you to some of the most common stereotypes for disdabled people on the media such as 'victims' and 'supercrib', and provide a vision of what should be an accurate portayal of disability.
+		//Let's forget what the media have told you about disability. Throw it all away! Drag the hashtag labels to the litter bin on your right. You shall find something interesting.
+		var bg1 = new createjs.Graphics()
+		bg1.beginFill("rgba(0,0,0,0.9)").drawRect(0,0,canvasW,canvasH)
+		
+		var bg = new createjs.Shape(bg1)
+		//var text1 = new createjs.Text("Disability. If the first picture that comes to your mind relates to athletes showing off their lost limps, or perhaps a sad miserable movie character in a wheelchair, be aware! Disability in the media seldom reflects reality. ",Math.floor(pH*0.035) + "px Bree Serif","(rgba(0,0,0,0)")   
+		
+		var text2 = new createjs.Text("Ooops. You were almost there. Try Again?",Math.floor(pH*0.035) + "px Bree Serif","white")
+		
+		
+		text2.lineWidth = pW * 0.8
+		
+		var continueButton  = new createjs.Container();
+		
+		var container = new createjs.Container();
+		container.addChild(bg,text2,continueButton)
+		container.alpha = 0
+		
+		stage.addChild(container)
+		
+		text2.x = pMarginX + pW/2- text2.getBounds().width/2
+		text2.y = canvasH*0.25
+		
+		
+		
+		var button1 = new createjs.Graphics();
+		button1.beginFill("rgba(255,0,0,0.5)").drawRoundRect(0,0,w,h,h/2)
+		var s1 = new createjs.Shape(button1);
+		var continueText = new createjs.Text("Try Again", Math.floor(h*0.7) + "px Ultra","rgba(255,255,255,1)")
+		continueText.textAlign = 'center'
+		continueText.x = w/2
+		continueText.y = h*0.1
+		
+		if (condition){
+			text2.text = "Congratulations! You won:) We hope that you've learned about mispresentation of disability in the media. Feel free to share this with your friends~"
+			continueText.text = "Play Again"
+			}
+		
+		continueButton.addChild(s1,continueText);
+		
+		continueButton.cursor = "pointer"
+		continueButton.regX = continueButton.getBounds().width/2
+		continueButton.regY = continueButton.getBounds().height/2
+		continueButton.x = pMarginX + pW/2 
+		continueButton.y = canvasH*0.5
+		
+		continueButton.on("mouseover",function(){
+		
+			continueButton.scaleX = continueButton.scaleY = 1.2
+		
+		})
+		
+		continueButton.on("mouseout",function(){
+		
+			continueButton.scaleX = continueButton.scaleY = 1
+		
+			})
+	
+		continueButton.on("click",function(evt){
+			resetGame();
+			drawGame();
+			}
+		
+		
+		)
+		
+		var tween = createjs.Tween.get(container)
+			.to({alpha:1},500)
+	}
+
+function drawLogo(){
+	var text = new createjs.Text("Dis-Ability","bold "+ Math.floor(pH*0.15)+"px Leckerli One","rgba(69,113,182,1)")
+	text.outline = Math.floor(pH*0.03)
+	
+	var text2 = text.clone()
+	text2.outline = false;
+	text2.color = "white"
+	var bmp = new createjs.Bitmap(logo)
+	var logoC = new createjs.Container()
+	logoC.addChild(text,text2)
+	stage.addChild(logoC)
+	bmp.alpha = 0
+	bmp.x = logoC.getBounds().width * 0.5
+	bmp.y = -logoC.getBounds().height*0.5
+	bmp.scaleX = bmp.scaleY = logoC.getBounds().width * 0.22 / logo.width 
+	var tween = createjs.Tween.get(bmp)
+				.wait(1000)
+				.to({x:logoC.getBounds().width * 0.9,alpha:1},1000)
+	logoC.removeChild(text2)
+	logoC.addChild(bmp,text2)
+	gameLogo = logoC.clone();
+	logoC.x = canvasW/2-logoC.getBounds().width/2
+	logoC.y = canvasH/4-logoC.getBounds().height/2
+	};
+
+
+function drawEffects(){
+	var colors = ["white"]
+	var hashtags = ["Ugly","Victim","Villain","Supercrib","ScarredForLife","Sadness","Lonely"]
+	
+	bgEffects = new createjs.Container()
+	stage.addChild(bgEffects)
+	for (var i=0; i<hashtags.length; i++){
+		if(i>=hashtags.length){
+			var num = i%(colors.length-1) 
+			var radius = pH*0.15 + pH *0.25 * Math.random();
+			var g = new createjs.Graphics();
+			g.beginLinearGradientFill([colors[num],colors[num+1]],[0,1],0,-radius,0,radius).drawCircle(0,0,radius)
+			
+			var object = new createjs.Shape(g);
+			object.rotation = 90 * Math.random() | 0
+		} else {
+			var size = pH *0.1 + pH *0.1 * Math.random();
+			var object = new createjs.Text("#" + hashtags[i], Math.floor(size) +"px Leckerli One",colors[i%colors.length])
+			object.textAlign = "center"
+			} 
+		object.x = canvasW * Math.random() 
+		object.y = canvasH * Math.random() 
+		object.velX = (1 + 2.5 *Math.random())*2 - 3.5
+		object.velY = (1.5 + 2.5 * Math.random())*2 - 3.5 
+		object.alpha = 0.1 + 0.2 * Math.random()  
+		bgEffects.addChild(object)
+		}
+	stage.update();
+	}
+
+function drawHashtag(x,y){
+	
+		var object = new createjs.Text("#", "40px Leckerli One","white")
+		object.textAlign = "center"
+		object.x = x
+		object.y = y
+		object.velX = ((1 + 2.5 *Math.random())*2 - 3.5)/2
+		object.velY = ((1 + 2.5 * Math.random())*2 - 3.5)/2
+		object.alpha = 0.1 + 0.2 * Math.random()  
+		hashtagContainer.addChild(object)
+		object.maxX = hashtagContainer.getBounds().width + hashtagContainer.getBounds().x - object.getBounds().width/2
+		object.maxY = hashtagContainer.getBounds().height + hashtagContainer.getBounds().y - object.getBounds().height
+		object.minX = hashtagContainer.getBounds().x + object.getBounds().width/2
+		object.minY = hashtagContainer.getBounds().y
+	stage.update();
+	}
+
+
+function drawStartButtons(){
+
+	var w = pW*0.3
+	var h = pH*0.075
+	
+	var playButton  = new createjs.Container();
+	var creditsButton = new createjs.Container();
+	
+	playButton.cursor = creditsButton.cursor = 'pointer'
+	
+	creditsButton.y = h*1.75
+	
+	var button1 = new createjs.Graphics();
+	button1.beginFill("rgba(255,255,255,0.15)").drawRoundRect(0,0,w,h,h/2)
+	var s1 = new createjs.Shape(button1);
+	var playText = new createjs.Text("Start Game", Math.floor(h*0.7) + "px Ultra","rgba(255,255,255,1)")
+	var button2 = button1.clone();
+	var s2 = new createjs.Shape(button2);
+	var creditText = new createjs.Text("Credits", Math.floor(h*0.7) + "px Ultra","rgba(255,255,255,1)")
+	playText.textAlign = creditText.textAlign = 'center'
+	playText.x = creditText.x = w/2
+	playText.y = creditText.y = h*0.1
+	
+	playButton.addChild(s1,playText);
+	
+	playButton.on("mouseover",function(){
+		
+		playButton.scaleX = playButton.scaleY = 1.2
+		
+		})
+		
+	playButton.on("mouseout",function(){
+		
+		playButton.scaleX = playButton.scaleY = 1
+		
+		})
+	
+	playButton.on("click",drawGame)
+	
+	creditsButton.addChild(s2,creditText);
+	
+	creditsButton.on("mouseover",function(){
+		
+		creditsButton.scaleX = creditsButton.scaleY = 1.2
+		
+		})
+		
+	creditsButton.on("mouseout",function(){
+		
+		creditsButton.scaleX = creditsButton.scaleY = 1
+		
+		})
+	
+	creditsButton.on("click",drawCredits)
+	
+	var buttons = new createjs.Container();
+	buttons.addChild(playButton,creditsButton)
+	stage.addChild(buttons)
+	playButton.regX = creditsButton.regX = w/2
+	playButton.regY = creditsButton.regY = h/2
+	//playButton.x -= w/2
+	buttons.x = canvasW/2
+	buttons.y = canvasH/2
+	stage.update();
+	};
+
+	function tick(event) {
+		if(puzzleOn && currentHashtags != null){
+			for (var i = 0; i < (currentHashtags.getNumChildren()+hashtagContainer.numChildren); i++) {
+				if (i<currentHashtags.getNumChildren()){
+				var hashtag = currentHashtags.getChildAt(i);} else{
+					var hashtag = hashtagContainer.getChildAt(i-currentHashtags.getNumChildren())
+					}
+			
+				if (hashtag != mouseTarget){
+				
+					hashtag.x = hashtag.x + hashtag.velX;
+					hashtag.y = hashtag.y + hashtag.velY;
+					
+					if(hashtag.x>hashtag.maxX || hashtag.x < hashtag.minX){
+						hashtag.velX = -hashtag.velX
+						}
+					if(hashtag.y>hashtag.maxY || hashtag.y <hashtag.minY){
+						hashtag.velY = -hashtag.velY
+						}
+				} 
+			}
+			//currentHashtags.cache(pMarginX,pMarginY,pW,pH)
+		} else{
+			
+			for (var j=0; j<bgEffects.numChildren;j++){
+				var obj  = bgEffects.getChildAt(j);
+				obj.x += obj.velX
+				obj.y += obj.velY
+				
+				if(obj.x>canvasW || obj.x < 0){
+					obj.velX = -obj.velX
+				}
+				if(obj.y>canvasH || obj.y<0){
+					obj.velY = -obj.velY
+					
+					}
+			}
+			
+			stage.update(event)
+			
+			}
+		//if (update) {
+			update = false; // only update once
+			stage.update(event);
+		//}
+	}
+	
+	function drawCredits(){
+		var container = new createjs.Container()
+		stage.addChild(container)
+		var bg1 = new createjs.Graphics()
+		bg1.beginFill("rgba(0,0,0,0.9)").drawRect(0,0,canvasW,canvasH)
+		var bg = new createjs.Shape(bg1)
+		container.addChild(bg)
+		
+		var lst = ["Organization","Media Smarts","Team NaCl","Helia Wong","Komal Javed","Cynthia Tsoi","Brandyn Tai","Andrew Muscat","Gordon Lam" ]
+		var lineHeight = pH/(lst.length+1)
+		for(var i=0;i<lst.length;i++){
+			var text = new createjs.Text(lst[i],"24px Bree Serif","white")
+			if (i==0 || i==2){
+				text.color = "pink"
+				}
+			
+			text.textAlign = 'center'
+			text.x = canvasW/2
+			text.y = pMarginY+lineHeight*(i+1)-12
+			container.addChild(text)
+			}
+		drawHome();
+		}
+</script>
+
+</head>
+
+<body onload="init();">
+
+<div>
+	<canvas id="testCanvas"></canvas>
+</div>
+</body>
+</html>
